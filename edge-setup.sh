@@ -41,7 +41,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=/root/.tunnel_auth
-ExecStart=/usr/bin/sshpass -p "${IRAN_PASS}" /usr/bin/autossh -M 20000 -N -R ${REVERSE_PORT}:localhost:22 ${IRAN_USER}@${IRAN_IP} -p ${IRAN_PORT} \
+ExecStart=/usr/bin/sshpass -p "${IRAN_PASS}" /usr/bin/autossh -M 20000 -N -R REVERSE_PORT:localhost:22 ${IRAN_USER}@IRAN_IP -p IRAN_PORT \
   -o ServerAliveInterval=40 \
   -o ServerAliveCountMax=3 \
   -o TCPKeepAlive=yes \
@@ -73,4 +73,3 @@ echo "• Restart delay → 60 seconds"
 echo ""
 echo "Reverse tunnel active on port: ${REVERSE_PORT}"
 echo ""
-
