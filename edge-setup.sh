@@ -7,16 +7,12 @@ echo ""
 
 read -p "Enter IRAN SERVER IP: " IRAN_IP
 read -p "Enter IRAN SSH PORT: " IRAN_PORT
+read -p "Enter IRAN SERVER USERNAME: " IRAN_USER
+read -s -p "Enter IRAN SERVER PASSWORD: " IRAN_PASS
+echo ""
 read -p "Enter REVERSE TUNNEL PORT (remote bind port): " REVERSE_PORT
 
-echo ""
-echo "Paste IRAN PUBLIC KEY (tunnel_key.pub)"
-echo "Finish with ENTER then CTRL+D"
-echo ""
-
-PUB_KEY=$(cat)
-
-if [ -z "$IRAN_IP" ] || [ -z "$IRAN_PORT" ] || [ -z "$REVERSE_PORT" ] || [ -z "$PUB_KEY" ]; then
+if [ -z "$IRAN_IP" ] || [ -z "$IRAN_PORT" ] || [ -z "$IRAN_USER" ] || [ -z "$IRAN_PASS" ] || [ -z "$REVERSE_PORT" ]; then
     echo ""
     echo "❌ Missing required values"
     exit 1
@@ -27,28 +23,29 @@ echo "Updating system..."
 apt update -y && apt upgrade -y
 
 echo "Installing required packages..."
-apt install -y autossh openssh-client
+apt install -y autossh openssh-client sshpass
 
-echo "Configuring SSH access..."
-mkdir -p /root/.ssh
-chmod 700 /root/.ssh
-
-echo "$PUB_KEY" >> /root/.ssh/authorized_keys
-chmod 600 /root/.ssh/authorized_keys
+# ذخیره امن نام کاربری و رمز عبور
+echo "Storing credentials securely..."
+echo "IRAN_USER=\"$IRAN_USER\"" > /root/.tunnel_auth
+echo "IRAN_PASS=\"$IRAN_PASS\"" >> /root/.tunnel_auth
+chmod 600 /root/.tunnel_auth
 
 echo "Creating persistent reverse tunnel service..."
 
-cat <<EOF > /etc/systemd/system/reverse-tunnel.service
+cat <<'EOF' > /etc/systemd/system/reverse-tunnel.service
 [Unit]
-Description=Reverse SSH Tunnel to Iran
+Description=Reverse SSH Tunnel to Iran (via password auth)
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/autossh -M 20000 -N -R ${REVERSE_PORT}:localhost:22 root@${IRAN_IP} -p ${IRAN_PORT} \\
-  -o ServerAliveInterval=40 \\
-  -o ServerAliveCountMax=3 \\
-  -o TCPKeepAlive=yes \\
-  -o ExitOnForwardFailure=yes \\
+Type=simple
+EnvironmentFile=/root/.tunnel_auth
+ExecStart=/usr/bin/sshpass -p "${IRAN_PASS}" /usr/bin/autossh -M 20000 -N -R ${REVERSE_PORT}:localhost:22 ${IRAN_USER}@${IRAN_IP} -p ${IRAN_PORT} \
+  -o ServerAliveInterval=40 \
+  -o ServerAliveCountMax=3 \
+  -o TCPKeepAlive=yes \
+  -o ExitOnForwardFailure=yes \
   -o StrictHostKeyChecking=no
 
 Restart=always
@@ -57,6 +54,11 @@ RestartSec=60
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# جایگزینی متغیرها در سرویس
+sed -i "s/REVERSE_PORT/${REVERSE_PORT}/g" /etc/systemd/system/reverse-tunnel.service
+sed -i "s/IRAN_IP/${IRAN_IP}/g" /etc/systemd/system/reverse-tunnel.service
+sed -i "s/IRAN_PORT/${IRAN_PORT}/g" /etc/systemd/system/reverse-tunnel.service
 
 systemctl daemon-reload
 systemctl enable reverse-tunnel
@@ -70,3 +72,5 @@ echo "• Real disconnect detection → 120 seconds"
 echo "• Restart delay → 60 seconds"
 echo ""
 echo "Reverse tunnel active on port: ${REVERSE_PORT}"
+echo ""
+
