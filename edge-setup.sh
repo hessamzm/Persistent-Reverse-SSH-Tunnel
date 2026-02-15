@@ -25,10 +25,15 @@ apt update -y && apt upgrade -y
 echo "Installing required packages..."
 apt install -y autossh openssh-client sshpass
 
-# ذخیره امن نام کاربری و رمز عبور
 echo "Storing credentials securely..."
-echo "IRAN_USER=\"$IRAN_USER\"" > /root/.tunnel_auth
-echo "IRAN_PASS=\"$IRAN_PASS\"" >> /root/.tunnel_auth
+cat <<EOF > /root/.tunnel_auth
+IRAN_USER="$IRAN_USER"
+IRAN_PASS="$IRAN_PASS"
+IRAN_IP="$IRAN_IP"
+IRAN_PORT="$IRAN_PORT"
+REVERSE_PORT="$REVERSE_PORT"
+EOF
+
 chmod 600 /root/.tunnel_auth
 
 echo "Creating persistent reverse tunnel service..."
@@ -41,7 +46,10 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=/root/.tunnel_auth
-ExecStart=/usr/bin/sshpass -p "${IRAN_PASS}" /usr/bin/autossh -M 20000 -N -R REVERSE_PORT:localhost:22 ${IRAN_USER}@IRAN_IP -p IRAN_PORT \
+
+ExecStart=/usr/bin/sshpass -p "$IRAN_PASS" \
+  /usr/bin/autossh -M 20000 -N \
+  -R $REVERSE_PORT:localhost:22 $IRAN_USER@$IRAN_IP -p $IRAN_PORT \
   -o ServerAliveInterval=40 \
   -o ServerAliveCountMax=3 \
   -o TCPKeepAlive=yes \
@@ -55,21 +63,12 @@ RestartSec=60
 WantedBy=multi-user.target
 EOF
 
-# جایگزینی متغیرها در سرویس
-sed -i "s/REVERSE_PORT/${REVERSE_PORT}/g" /etc/systemd/system/reverse-tunnel.service
-sed -i "s/IRAN_IP/${IRAN_IP}/g" /etc/systemd/system/reverse-tunnel.service
-sed -i "s/IRAN_PORT/${IRAN_PORT}/g" /etc/systemd/system/reverse-tunnel.service
-
 systemctl daemon-reload
 systemctl enable reverse-tunnel
 systemctl restart reverse-tunnel
 
 echo ""
 echo "✅ EDGE SERVER READY"
-echo ""
-echo "Tunnel Behavior:"
-echo "• Real disconnect detection → 120 seconds"
-echo "• Restart delay → 60 seconds"
 echo ""
 echo "Reverse tunnel active on port: ${REVERSE_PORT}"
 echo ""
