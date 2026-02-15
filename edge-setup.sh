@@ -7,6 +7,7 @@ echo ""
 
 read -p "Enter IRAN SERVER IP: " IRAN_IP
 read -p "Enter IRAN SSH PORT: " IRAN_PORT
+read -p "Enter REVERSE TUNNEL PORT (remote bind port): " REVERSE_PORT
 
 echo ""
 echo "Paste IRAN PUBLIC KEY (tunnel_key.pub)"
@@ -15,7 +16,7 @@ echo ""
 
 PUB_KEY=$(cat)
 
-if [ -z "$IRAN_IP" ] || [ -z "$IRAN_PORT" ] || [ -z "$PUB_KEY" ]; then
+if [ -z "$IRAN_IP" ] || [ -z "$IRAN_PORT" ] || [ -z "$REVERSE_PORT" ] || [ -z "$PUB_KEY" ]; then
     echo ""
     echo "❌ Missing required values"
     exit 1
@@ -29,7 +30,6 @@ echo "Installing required packages..."
 apt install -y autossh openssh-client
 
 echo "Configuring SSH access..."
-
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 
@@ -44,7 +44,7 @@ Description=Reverse SSH Tunnel to Iran
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/autossh -M 20000 -N -R 2222:localhost:22 root@${IRAN_IP} -p ${IRAN_PORT} \\
+ExecStart=/usr/bin/autossh -M 20000 -N -R ${REVERSE_PORT}:localhost:22 root@${IRAN_IP} -p ${IRAN_PORT} \\
   -o ServerAliveInterval=40 \\
   -o ServerAliveCountMax=3 \\
   -o TCPKeepAlive=yes \\
@@ -69,3 +69,4 @@ echo "Tunnel Behavior:"
 echo "• Real disconnect detection → 120 seconds"
 echo "• Restart delay → 60 seconds"
 echo ""
+echo "Reverse tunnel active on port: ${REVERSE_PORT}"
